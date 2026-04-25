@@ -22,7 +22,7 @@ import type { DisputeNature } from "@/lib/types"
 export default function FileComplaintPage() {
   const router = useRouter()
   const { createCase, updateCase, addSmsLog } = useCaseStore()
-  const { user } = useAuth()
+  const { user, isLoggedIn } = useAuth()
 
   const [respondentName, setRespondentName] = useState("")
   const [respondentPhone, setRespondentPhone] = useState("")
@@ -31,9 +31,28 @@ export default function FileComplaintPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async () => {
+    if (!isLoggedIn || !user) {
+      toast.error("Kailangan munang mag-login")
+      router.push("/login")
+      return
+    }
+
     if (!respondentName.trim()) { toast.error("Pakilagay ang pangalan ng respondent"); return }
     if (!nature) { toast.error("Pumili ng uri ng reklamo"); return }
     if (!description.trim()) { toast.error("Pakilagay ang maikling paglalarawan"); return }
+    if (description.trim().length < 20) {
+      toast.error("Pakihabaan pa ang paglalarawan (at least 20 characters)")
+      return
+    }
+
+    const trimmedRespondentPhone = respondentPhone.trim()
+    if (trimmedRespondentPhone) {
+      const normalized = formatPhone(trimmedRespondentPhone)
+      if (!/^\+63\d{10}$/.test(normalized)) {
+        toast.error("Hindi valid ang numero ng respondent")
+        return
+      }
+    }
 
     setSubmitting(true)
     try {
@@ -42,7 +61,7 @@ export default function FileComplaintPage() {
 
       // Create case
       const newCase = createCase({
-        complainant: { name: user?.name ?? "Complainant", phone: user?.phone ?? "+639000000000" },
+        complainant: { name: user.name, phone: user.phone },
         respondent: { name: respondentName.trim(), phone: formatPhone(respondentPhone) },
         nature: nature as DisputeNature,
         description: description.trim(),
@@ -57,9 +76,9 @@ export default function FileComplaintPage() {
       addSmsLog(smsResult)
 
       // If respondent phone provided, notify them too
-      if (respondentPhone.trim()) {
+      if (trimmedRespondentPhone) {
         const respSms = await sendAndLog(
-          formatPhone(respondentPhone),
+          formatPhone(trimmedRespondentPhone),
           `[eSumbong] May reklamo laban sa inyo (Ref: ${newCase.id}). Pumunta sa Brgy Hall para sa impormasyon.`
         )
         addSmsLog(respSms)

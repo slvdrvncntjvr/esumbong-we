@@ -60,7 +60,7 @@ function Navbar() {
 // ── Hero ──────────────────────────────────────────────────────────
 function HeroSection() {
   return (
-    <section className="max-w-7xl mx-auto px-6 py-16 md:py-24 grid md:grid-cols-2 gap-12 items-center">
+    <section id="features" className="max-w-7xl mx-auto px-6 py-16 md:py-24 grid md:grid-cols-2 gap-12 items-center">
       {/* Left — Text */}
       <div className="space-y-6">
         <span className="inline-flex items-center gap-2 bg-[#EFF6FF] text-[#3B82F6] text-xs font-medium px-3 py-1.5 rounded-full">

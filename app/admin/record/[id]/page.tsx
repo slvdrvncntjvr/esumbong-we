@@ -11,7 +11,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PhoneFrame } from "@/components/phone-frame"
 import { useCaseStore } from "@/lib/store"
-import { DISPUTE_LABELS } from "@/lib/types"
+import { useAuth } from "@/lib/auth"
 import { sendAndLog, buildHearingResultSms, buildNoShowWarningSms } from "@/lib/sms"
 import { cn } from "@/lib/utils"
 
@@ -20,6 +20,7 @@ type Attendance = "appeared" | "absent" | null
 export default function RecordOutcomePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const { user, isLoggedIn, login } = useAuth()
   const { getCaseById, recordHearingOutcome, addSmsLog } = useCaseStore()
   const c = getCaseById(id)
 
@@ -27,6 +28,23 @@ export default function RecordOutcomePage({ params }: { params: Promise<{ id: st
   const [respondent, setRespondent] = useState<Attendance>(null)
   const [result, setResult] = useState<string>("")
   const [saving, setSaving] = useState(false)
+
+  const isAdmin = user?.role === "secretary" || user?.role === "captain"
+
+  if (!isLoggedIn || !isAdmin) {
+    return (
+      <PhoneFrame>
+        <div className="flex flex-col flex-1 items-center justify-center px-8 text-center space-y-4">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Admin Access</h1>
+          <p className="text-sm text-muted-foreground">Kailangan ng barangay admin demo account para mag-record ng hearing outcomes.</p>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => login("secretary")}>Login as Secretary</Button>
+            <Button variant="outline" onClick={() => router.push("/login")}>Back to Login</Button>
+          </div>
+        </div>
+      </PhoneFrame>
+    )
+  }
 
   if (!c) {
     return (

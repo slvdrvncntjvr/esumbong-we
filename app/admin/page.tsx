@@ -1,16 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Search, ChevronRight, Calendar, Plus, RotateCcw } from "lucide-react"
+import { Search, ChevronRight, Calendar, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 
 import { TabletFrame } from "@/components/tablet-frame"
 import { Button } from "@/components/ui/button"
 import { useCaseStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth"
-import { computeDaysRemaining, computeUrgency, DISPUTE_LABELS, generateHearingId } from "@/lib/types"
+import { computeDaysRemaining, computeUrgency, DISPUTE_LABELS } from "@/lib/types"
 import { COMPLEXITY_LABELS, COMPLEXITY_COLORS } from "@/lib/gemini"
 import { sendAndLog, buildHearingReminderSms } from "@/lib/sms"
 import { cn } from "@/lib/utils"
@@ -19,18 +18,12 @@ import type { Case } from "@/lib/types"
 export default function AdminDashboardPage() {
   const { cases, smsLog, addHearing, addSmsLog, resetToSeed } = useCaseStore()
   const { user, login, isLoggedIn } = useAuth()
-  const router = useRouter()
   const [search, setSearch] = useState("")
   const [schedulingFor, setSchedulingFor] = useState<string | null>(null)
   const [schedDate, setSchedDate] = useState("")
   const [schedTime, setSchedTime] = useState("10:00 AM")
 
-  // Auto-login as secretary if not logged in as admin
-  useEffect(() => {
-    if (!isLoggedIn || (user?.role !== "secretary" && user?.role !== "captain")) {
-      login("secretary")
-    }
-  }, [isLoggedIn, user?.role, login])
+  const isAdmin = user?.role === "secretary" || user?.role === "captain"
 
   const activeCases = cases.filter((c) => c.status !== "settled" && c.status !== "cfa_approved" && c.status !== "dismissed")
   const hearingsToday = activeCases.filter((c) => {
@@ -58,8 +51,22 @@ export default function AdminDashboardPage() {
 
   const handleSchedule = async (caseId: string) => {
     if (!schedDate) { toast.error("Pumili ng petsa"); return }
+
+    const selectedDate = new Date(`${schedDate}T00:00:00`)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (selectedDate < today) {
+      toast.error("Hindi puwedeng mag-schedule sa nakaraang petsa")
+      return
+    }
+
     const c = cases.find((x) => x.id === caseId)
     if (!c) return
+
+    if (c.hearings.some((h) => h.result === "pending")) {
+      toast.error("May nakabukas nang hearing schedule para sa kasong ito")
+      return
+    }
 
     addHearing(caseId, {
       date: schedDate,
@@ -73,14 +80,34 @@ export default function AdminDashboardPage() {
     const smsContent = buildHearingReminderSms(caseId, schedDate, schedTime)
     const r1 = await sendAndLog(c.complainant.phone, smsContent)
     addSmsLog(r1)
-    const r2 = await sendAndLog(c.respondent.phone, smsContent)
-    addSmsLog(r2)
+
+    if (/^\+63\d{10}$/.test(c.respondent.phone)) {
+      const r2 = await sendAndLog(c.respondent.phone, smsContent)
+      addSmsLog(r2)
+    }
 
     toast.success(`Hearing na-schedule para sa ${schedDate}`, {
       description: "SMS paalala ipinadala sa dalawang partido.",
     })
     setSchedulingFor(null)
     setSchedDate("")
+  }
+
+  if (!isLoggedIn || !isAdmin) {
+    return (
+      <TabletFrame>
+        <div className="flex flex-col flex-1 items-center justify-center px-8 text-center space-y-4">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Admin Access</h1>
+          <p className="text-sm text-muted-foreground max-w-md">
+            Ang page na ito ay para sa Barangay Secretary o Captain demo account.
+          </p>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => login("secretary")}>Login as Secretary</Button>
+            <Button variant="outline" onClick={() => login("captain")}>Login as Captain</Button>
+          </div>
+        </div>
+      </TabletFrame>
+    )
   }
 
   return (
@@ -92,7 +119,7 @@ export default function AdminDashboardPage() {
             <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Sec. {user?.name ?? "Maria Santos"}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => { resetToSeed(); toast.info("Data na-reset sa demo seed.") }} className="size-9 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Reset demo data">
+            <button onClick={() => { resetToSeed(); toast.info("Data na-reset sa demo seed.") }} className="size-9 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Reset demo data" aria-label="Reset demo data">
               <RotateCcw className="size-4" />
             </button>
             <div className="hidden md:flex items-center gap-2 bg-muted rounded-xl px-3 h-10">

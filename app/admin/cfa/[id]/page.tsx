@@ -9,16 +9,20 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { PhoneFrame } from "@/components/phone-frame"
 import { useCaseStore } from "@/lib/store"
+import { useAuth } from "@/lib/auth"
 import { DISPUTE_LABELS } from "@/lib/types"
 import { sendAndLog, buildCfaReadySms } from "@/lib/sms"
 
 export default function CfaApprovalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const { user, isLoggedIn, login } = useAuth()
   const { getCaseById, approveCfa, addSmsLog } = useCaseStore()
   const c = getCaseById(id)
   const [approved, setApproved] = useState(false)
   const [approving, setApproving] = useState(false)
+
+  const isAdmin = user?.role === "secretary" || user?.role === "captain"
 
   if (!c) {
     return (
@@ -52,6 +56,21 @@ export default function CfaApprovalPage({ params }: { params: Promise<{ id: stri
   const today = new Date()
   const dateStr = today.toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })
 
+  if (!isLoggedIn || !isAdmin) {
+    return (
+      <PhoneFrame>
+        <div className="flex flex-col flex-1 items-center justify-center px-8 text-center space-y-4">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Admin Access</h1>
+          <p className="text-sm text-muted-foreground">Kailangan ng barangay admin demo account para sa CFA approval.</p>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => login("secretary")}>Login as Secretary</Button>
+            <Button variant="outline" onClick={() => router.push("/login")}>Back to Login</Button>
+          </div>
+        </div>
+      </PhoneFrame>
+    )
+  }
+
   if (approved) {
     return (
       <PhoneFrame>
@@ -67,9 +86,12 @@ export default function CfaApprovalPage({ params }: { params: Promise<{ id: stri
           <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
             <div className="w-32 h-32 mx-auto bg-foreground/5 rounded-lg flex items-center justify-center border border-border">
               <div className="grid grid-cols-5 gap-[2px]">
-                {Array.from({ length: 25 }).map((_, i) => (
-                  <div key={i} className={`size-4 rounded-sm ${Math.random() > 0.4 ? "bg-foreground" : "bg-transparent"}`} />
-                ))}
+                {Array.from({ length: 25 }).map((_, i) => {
+                  const code = (c.id.charCodeAt(i % c.id.length) + i * 7) % 5
+                  return (
+                    <div key={i} className={`size-4 rounded-sm ${code >= 2 ? "bg-foreground" : "bg-transparent"}`} />
+                  )
+                })}
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground font-mono">esumbong.app/verify/{c.id}</p>

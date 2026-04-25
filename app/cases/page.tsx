@@ -1,22 +1,37 @@
 "use client"
 
+import { useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import { PhoneFrame } from "@/components/phone-frame"
 import { BottomNav } from "@/components/bottom-nav"
 import { useCaseStore } from "@/lib/store"
+import { useAuth } from "@/lib/auth"
 import { computeDaysRemaining, computeUrgency, DISPUTE_LABELS } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export default function CasesPage() {
   const { cases } = useCaseStore()
+  const { user, isLoggedIn } = useAuth()
+  const router = useRouter()
 
-  const sorted = [...cases].sort((a, b) => {
+  useEffect(() => {
+    if (!isLoggedIn) router.replace("/login")
+  }, [isLoggedIn, router])
+
+  const visibleCases = user?.role === "citizen"
+    ? cases.filter((c) => c.complainant.phone === user.phone)
+    : cases
+
+  const sorted = [...visibleCases].sort((a, b) => {
     const order: Record<string, number> = { critical: 0, warning: 1, normal: 2 }
     const ua = computeUrgency(computeDaysRemaining(a.deadlineDate))
     const ub = computeUrgency(computeDaysRemaining(b.deadlineDate))
-    if (a.status === "settled" || a.status === "cfa_approved") return 1
-    if (b.status === "settled" || b.status === "cfa_approved") return -1
+    const aClosed = a.status === "settled" || a.status === "cfa_approved" || a.status === "dismissed"
+    const bClosed = b.status === "settled" || b.status === "cfa_approved" || b.status === "dismissed"
+    if (aClosed && !bClosed) return 1
+    if (!aClosed && bClosed) return -1
     return (order[ua] ?? 2) - (order[ub] ?? 2)
   })
 

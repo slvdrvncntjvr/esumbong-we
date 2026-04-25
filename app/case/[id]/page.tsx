@@ -1,11 +1,14 @@
 "use client"
 
+import { useEffect } from "react"
 import { use } from "react"
 import Link from "next/link"
-import { ChevronLeft, Calendar, MapPin, User, Check, AlertTriangle, Clock } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ChevronLeft, Calendar, MapPin, User, Check, AlertTriangle } from "lucide-react"
 import { PhoneFrame } from "@/components/phone-frame"
 import { BottomNav } from "@/components/bottom-nav"
 import { useCaseStore } from "@/lib/store"
+import { useAuth } from "@/lib/auth"
 import { computeDaysRemaining, computeUrgency, DISPUTE_LABELS } from "@/lib/types"
 import { COMPLEXITY_LABELS, COMPLEXITY_COLORS } from "@/lib/gemini"
 import { cn } from "@/lib/utils"
@@ -13,7 +16,13 @@ import { cn } from "@/lib/utils"
 export default function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { getCaseById } = useCaseStore()
+  const { user, isLoggedIn } = useAuth()
+  const router = useRouter()
   const c = getCaseById(id)
+
+  useEffect(() => {
+    if (!isLoggedIn) router.replace("/login")
+  }, [isLoggedIn, router])
 
   if (!c) {
     return (
@@ -21,6 +30,18 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         <div className="flex flex-col flex-1 items-center justify-center px-6">
           <p className="text-muted-foreground">Case not found.</p>
           <Link href="/dashboard" className="text-primary text-sm mt-2 underline underline-offset-4">Back to dashboard</Link>
+        </div>
+      </PhoneFrame>
+    )
+  }
+
+  const citizenCannotAccess = user?.role === "citizen" && c.complainant.phone !== user.phone
+  if (citizenCannotAccess) {
+    return (
+      <PhoneFrame>
+        <div className="flex flex-col flex-1 items-center justify-center px-6">
+          <p className="text-muted-foreground text-center">Wala kang access sa kasong ito.</p>
+          <Link href="/cases" className="text-primary text-sm mt-2 underline underline-offset-4">Bumalik sa listahan</Link>
         </div>
       </PhoneFrame>
     )

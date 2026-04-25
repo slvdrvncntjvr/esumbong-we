@@ -21,9 +21,13 @@ export default function DashboardPage() {
     if (!isLoggedIn) router.replace("/login")
   }, [isLoggedIn, router])
 
-  // For citizen: show their cases. For admin: show all.
+  // For citizens, only show their own cases. Admin roles can see all.
   const role = user?.role ?? "citizen"
-  const activeCases = cases.filter((c) => c.status !== "settled" && c.status !== "cfa_approved" && c.status !== "dismissed")
+  const visibleCases = role === "citizen"
+    ? cases.filter((c) => c.complainant.phone === user?.phone)
+    : cases
+
+  const activeCases = visibleCases.filter((c) => c.status !== "settled" && c.status !== "cfa_approved" && c.status !== "dismissed")
   const topCase = activeCases[0]
   const userName = user?.name?.split(" ")[0] ?? "User"
 
